@@ -7,32 +7,24 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ByteWise MQTT',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter MQTT Communication'),
+    return const MaterialApp(
+      home: MyHomePage(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
+  const MyHomePage({super.key});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
   late MqttServerClient _client;
   bool _isConnected = false;
 
@@ -43,13 +35,12 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _setupMqtt() {
-    _client = MqttServerClient('broker.hivemq.com', 'flutter_client');
-    _client.logging(on: true);
+    _client = MqttServerClient('bytewise.cloud.shiftr.io', 'BW-mA2Prw6ZqllC9PXr');
+    _client.port = 1883;
     _client.keepAlivePeriod = 20;
     _client.onConnected = _onConnected;
     _client.onDisconnected = _onDisconnected;
-    _client.onSubscribed = _onSubscribed;
-    _client.connect();
+    _client.connect('bytewise', 'gDQI0dHuCD0bXwTG');
   }
 
   void _onConnected() {
@@ -57,7 +48,6 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _isConnected = true;
     });
-    _subscribeToPongTopic();
   }
 
   void _onDisconnected() {
@@ -67,39 +57,21 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void _onSubscribed(String topic) {
-    print('Subscribed to topic: $topic');
-  }
-
-  void _incrementCounterAndSendMessage() {
-    setState(() {
-      _counter++;
-    });
-
+  void _sendMessageToESP32() {
     final MqttClientPayloadBuilder builder = MqttClientPayloadBuilder();
-    builder.addString('Ping $_counter');
-
+    builder.addString('Hello from Flutter');
     if (_isConnected) {
-      _client.publishMessage(
-        'app/ping', // Publish to "ping" topic
-        MqttQos.atLeastOnce,
-        builder.payload!,
-      );
+      _client.publishMessage('/devices/mA2Prw6ZqllC9PXr', MqttQos.atLeastOnce, builder.payload!);
     } else {
       print('Not connected to MQTT broker');
     }
-  }
-
-  void _subscribeToPongTopic() {
-    _client.subscribe('esp/response', MqttQos.atLeastOnce);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
+        title: const Text('MQTT Communication'),
       ),
       body: Center(
         child: Column(
@@ -114,20 +86,12 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            ElevatedButton(
+              onPressed: _sendMessageToESP32,
+              child: const Text('Send Message to ESP32'),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounterAndSendMessage,
-        tooltip: 'Increment and Send Message to ESP32',
-        child: const Icon(Icons.add),
       ),
     );
   }

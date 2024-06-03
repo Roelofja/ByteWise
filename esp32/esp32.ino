@@ -1,17 +1,26 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
-const char* ssid = "NETGEAR61";
-const char* password = "pastelapple849";
-const char* mqttServer = "bytewise.cloud.shiftr.io";
+/* Your unique ByteWise device token goes here */
+#define BYTEWISE_DEVICE_TOKEN "mA2Prw6ZqllC9PXr"
+
+/* Your WiFi information goes here */
+const char ssid[] = "NETGEAR61";
+const char password[] = "pastelapple849";
+ 
+
+const char mqttServer[] = "bytewise.cloud.shiftr.io";
 const int mqttPort = 1883;
-const char* mqttUser = "bytewise";
-const char* mqttPassword = "gDQI0dHuCD0bXwTG";
+const char mqttUser[] = "bytewise";
+const char mqttPassword[] = "gDQI0dHuCD0bXwTG";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void setup_wifi() {
+String clientId; // Unique client ID variable
+String deviceTopic; // Unique device topic variable
+
+void setupWifi() {
     delay(10);
     Serial.println();
     Serial.print("Connecting to ");
@@ -27,12 +36,32 @@ void setup_wifi() {
     Serial.println(WiFi.localIP());
 }
 
+void setupMqtt() {
+    uint64_t chipId = ESP.getEfuseMac(); // ESP32 MAC address
+
+    clientId = "ESP32-" + String(chipId, HEX);
+    deviceTopic = "/devices/" BYTEWISE_DEVICE_TOKEN;
+
+    client.setServer(mqttServer, mqttPort);
+    client.setCallback(messageRecievedCallback);
+}
+
+void messageRecievedCallback(char* topic, byte* payload, unsigned int length) {
+    Serial.print("Message arrived [");
+    Serial.print(topic);
+    Serial.print("] ");
+    for (int i = 0; i < length; i++) {
+        Serial.print((char)payload[i]);
+    }
+    Serial.println();
+}
+
 void reconnect() {
     while (!client.connected()) {
         Serial.print("Attempting MQTT connection...");
-        if (client.connect("ESP32Client", mqttUser, mqttPassword)) {
+        if (client.connect(clientId.c_str(), mqttUser, mqttPassword)) {
             Serial.println("connected");
-            client.subscribe("esp/send");
+            client.subscribe(deviceTopic.c_str());
         } else {
             Serial.print("failed, rc=");
             Serial.print(client.state());
@@ -45,8 +74,8 @@ void reconnect() {
 // Setup before loop
 void setup() {
     Serial.begin(115200);
-    setup_wifi();
-    client.setServer(mqttServer, mqttPort);
+    setupWifi();
+    setupMqtt();
 }
 
 // Main loop 
@@ -55,9 +84,8 @@ void loop() {
         reconnect();
     }
     client.loop();
-    // Your main code goes here
-    if(client.publish("esp/send", "Hello")) {
-        Serial.println("Message sent");
-    }
-    delay(5000);
+    // if(client.publish(byteWiseTopic.c_str(), "Hello")) {
+    //     Serial.println("Message sent");
+    // }
+    // delay(5000);
 }
