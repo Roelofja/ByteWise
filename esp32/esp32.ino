@@ -5,20 +5,21 @@
 /* Your unique ByteWise device token goes here */
 #define BYTEWISE_DEVICE_TOKEN "mA2Prw6ZqllC9PXr"
 
+#define MQTT_SERVER "bytewise.cloud.shiftr.io"
+#define MQTT_PORT 1883
+#define MQTT_USER "bytewise"
+#define MQTT_PASS "gDQI0dHuCD0bXwTG"
+
 /* Your WiFi information goes here */
 char ssid[] = "NETGEAR61";
 char password[] = "pastelapple849";
 
-const char mqttServer[] = "bytewise.cloud.shiftr.io";
-const int mqttPort = 1883;
-const char mqttUser[] = "bytewise";
-const char mqttPassword[] = "gDQI0dHuCD0bXwTG";
-
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-String clientId; // Unique client ID variable
-String deviceTopic; // Unique device topic variable
+String clientId; // Unique client ID for this device
+String instanceTopic; // Unique app instance topic
+String statusTopic; // Unique status/will topic for this device 
 
 String messageRecieved;
 
@@ -68,10 +69,12 @@ void setupMqtt()
     uint64_t chipId = ESP.getEfuseMac(); // ESP32 MAC address
 
     clientId = "ESP32-" + String(chipId, HEX);
-    deviceTopic = "/devices/" BYTEWISE_DEVICE_TOKEN;
+    instanceTopic = "/instances/" BYTEWISE_DEVICE_TOKEN;
+    statusTopic = "/devices/" + clientId + "/status";
 
-    client.setServer(mqttServer, mqttPort);
+    client.setServer(MQTT_SERVER, MQTT_PORT);
     client.setCallback(messageRecievedCallback);
+    client.setKeepAlive(1);
 }
 
 void messageRecievedCallback(char* topic, byte* payload, unsigned int length)
@@ -111,10 +114,12 @@ void reconnect()
     while(!client.connected())
     {
         Serial.print("Attempting MQTT connection...");
-        if(client.connect(clientId.c_str(), mqttUser, mqttPassword))
+        if(client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS, 
+                          statusTopic.c_str(), 1, false, "0"))
         {
             Serial.println("connected");
-            client.subscribe(deviceTopic.c_str());
+            client.subscribe(instanceTopic.c_str());
+            client.publish(statusTopic.c_str(), "1", true);
         }
         else
         {

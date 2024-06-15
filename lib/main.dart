@@ -46,13 +46,17 @@ enum Mode {
 
 Config config = []; // ESP-32 board configuration
 
+GPIO? selectedGpio;
+Mode? selectedMode;
+Color statusColor = const Color(0xFF901616);
+
 final client = MqttServerClient('bytewise.cloud.shiftr.io', 'BW-mA2Prw6ZqllC9PXr');
 
-void main() {
+void main() async {
   client.keepAlivePeriod = 20;
   client.onConnected = onConnected;
   client.onDisconnected = onDisconnected;
-  client.connect('bytewise', 'gDQI0dHuCD0bXwTG');
+  await client.connect('bytewise', 'gDQI0dHuCD0bXwTG');
 
   runApp(const ByteWise());
 }
@@ -64,6 +68,38 @@ void onConnected() {
 void onDisconnected() {
   print('Disconnected from MQTT broker');
 }
+
+void addConfig() {
+  if(selectedGpio != null && selectedMode != null) {
+    bool isUnique = config.every((element) =>
+      element['gpio'] != selectedGpio!.value
+    );
+    if(isUnique){
+      config.add(
+        {
+          "gpio": selectedGpio!.value,
+          "mode": selectedMode!.value,
+          "output": 1,
+        }
+      );
+      sendConfig();
+    }
+  }
+}
+
+void removeConfig() {
+
+}
+
+void sendConfig() {
+  final MqttClientPayloadBuilder builder = MqttClientPayloadBuilder();
+  final String jsonData = jsonEncode({"config": config});
+  builder.addString(jsonData);
+  client.publishMessage('/instances/mA2Prw6ZqllC9PXr', MqttQos.atLeastOnce, builder.payload!);
+  print(jsonData);
+}
+
+// App Building //
 
 class ByteWise extends StatelessWidget {
   const ByteWise({super.key});
@@ -88,8 +124,27 @@ class MyHomePage extends StatefulWidget {
 }
 
 class BoardConfigPage extends State<MyHomePage> {
-  GPIO? selectedGpio;
-  Mode? selectedMode;
+
+  @override
+  void initState() {
+    client.subscribe("devices/ESP32-58b45be2dec4/status", MqttQos.atLeastOnce);
+    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? messages) {
+      final MqttPublishMessage message = messages![0].payload as MqttPublishMessage;
+      final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message);
+      if(payload.isNotEmpty) {
+        setState(() {
+          if(payload == '1') {
+            statusColor = const Color(0xFF16906C);
+          }
+          else {
+            statusColor = const Color(0xFF901616);
+          }
+        });
+      }
+      print(payload);
+    });
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,21 +152,21 @@ class BoardConfigPage extends State<MyHomePage> {
       backgroundColor: const Color(0xFF1E1E1E),
       appBar: AppBar(
         backgroundColor: const Color(0xFF2D4963),
-        title: const Row(
+        title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               "Connection Status",
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 15,
               ),
             ),
-            SizedBox(
+            const SizedBox(
               width: 10,
             ),
             CircleAvatar(
-              backgroundColor: Color(0xFF16906C),
+              backgroundColor: statusColor,
               maxRadius: 8,
             )
           ],
@@ -199,29 +254,7 @@ class BoardConfigPage extends State<MyHomePage> {
                 height: 24,
               ),
               ElevatedButton(
-                onPressed: () {
-                  if(selectedGpio != null && selectedMode != null) {
-                    bool isUnique = config.every((element) =>
-                      element['gpio'] != selectedGpio!.value
-                    );
-                    if(isUnique){
-                      setState(() {
-                        config.add(
-                          {
-                            "gpio": selectedGpio?.value,
-                            "mode": selectedMode?.value,
-                            "output": 1,
-                          }
-                        );
-                      });
-                      final MqttClientPayloadBuilder builder = MqttClientPayloadBuilder();
-                      final String jsonData = jsonEncode({"config": config});
-                      builder.addString(jsonData);
-                      client.publishMessage('/devices/mA2Prw6ZqllC9PXr', MqttQos.exactlyOnce, builder.payload!);
-                      print(jsonData);
-                    }
-                  }
-                },
+                onPressed: addConfig,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF436C92),
                   minimumSize: const Size(450, 50),
