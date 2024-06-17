@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
+import 'dart:math';
 
 typedef Config = List<Map<String, dynamic>>;
 
@@ -50,7 +51,9 @@ GPIO? selectedGpio;
 Mode? selectedMode;
 Color statusColor = const Color(0xFF901616);
 
-final client = MqttServerClient('bytewise.cloud.shiftr.io', 'BW-mA2Prw6ZqllC9PXr');
+final client = MqttServerClient('bytewise.cloud.shiftr.io', 'BW-${generateUniqueToken(16)}');
+
+const String tokenChars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
 
 void main() async {
   client.keepAlivePeriod = 20;
@@ -87,16 +90,19 @@ void addConfig() {
   }
 }
 
-void removeConfig() {
-
-}
-
 void sendConfig() {
   final MqttClientPayloadBuilder builder = MqttClientPayloadBuilder();
   final String jsonData = jsonEncode({"config": config});
   builder.addString(jsonData);
-  client.publishMessage('/instances/mA2Prw6ZqllC9PXr', MqttQos.atLeastOnce, builder.payload!);
+  client.publishMessage('/devices/mA2Prw6ZqllC9PXr', MqttQos.atLeastOnce, builder.payload!);
   print(jsonData);
+}
+
+String generateUniqueToken(int length) {
+  Random r = Random.secure();
+  return String.fromCharCodes(Iterable.generate(
+    length, (_) => tokenChars.codeUnitAt(r.nextInt(tokenChars.length))
+  ));
 }
 
 // App Building //
@@ -124,10 +130,11 @@ class MyHomePage extends StatefulWidget {
 }
 
 class BoardConfigPage extends State<MyHomePage> {
+  
 
   @override
   void initState() {
-    client.subscribe("devices/ESP32-58b45be2dec4/status", MqttQos.atLeastOnce);
+    client.subscribe("devices/mA2Prw6ZqllC9PXr/status", MqttQos.atLeastOnce);
     client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? messages) {
       final MqttPublishMessage message = messages![0].payload as MqttPublishMessage;
       final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message);
@@ -176,7 +183,6 @@ class BoardConfigPage extends State<MyHomePage> {
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Align(
                 alignment: Alignment.centerLeft,
@@ -192,69 +198,80 @@ class BoardConfigPage extends State<MyHomePage> {
               const SizedBox(
                 height: 24,
               ),
-              DropdownMenu<GPIO>(
-                onSelected: (value) {
-                  setState(() {
-                    selectedGpio = value;
-                  });
-                },
-                hintText: "Pin",
-                width: 400,
-                menuHeight: 400,
-                textStyle: const TextStyle(
-                  color: Color(0xFF828282)
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFF303030),
                 ),
-                inputDecorationTheme: const InputDecorationTheme(
-                  hintStyle: TextStyle(
-                    color: Color(0xFF828282),
+                child: DropdownMenu<GPIO>(
+                  onSelected: (value) {
+                    setState(() {
+                      selectedGpio = value;
+                    });
+                  },
+                  hintText: "Pin",
+                  width: 400,
+                  menuHeight: 400,
+                  textStyle: const TextStyle(
+                    color: Color(0xFF828282)
                   ),
-                  filled: true,
-                  fillColor: Color(0xFF303030),
-                  border: InputBorder.none,
+                  inputDecorationTheme: const InputDecorationTheme(
+                    hintStyle: TextStyle(
+                      color: Color(0xFF828282),
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(15)
+                  ),
+                  dropdownMenuEntries: GPIO.values.map<DropdownMenuEntry<GPIO>>((GPIO gpio) {
+                    return DropdownMenuEntry<GPIO>(
+                      value: gpio,
+                      label: gpio.name.toUpperCase(),
+                    );
+                  }).toList(),
                 ),
-                dropdownMenuEntries: GPIO.values.map<DropdownMenuEntry<GPIO>>((GPIO gpio) {
-                  return DropdownMenuEntry<GPIO>(
-                    value: gpio,
-                    label: gpio.name.toUpperCase(),
-                  );
-                }).toList(),
               ),
               const SizedBox(
-                height: 24,
+                height: 16,
               ),
-              DropdownMenu<Mode>(
-                onSelected: (value) {
-                  setState(() {
-                    selectedMode = value;
-                  });
-                  print(selectedMode);
-                },
-                hintText: "Function",
-                width: 400,
-                menuHeight: 400,
-                textStyle: const TextStyle(
-                  color: Color(0xFF828282)
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFF303030),
                 ),
-                inputDecorationTheme: const InputDecorationTheme(
-                  hintStyle: TextStyle(
-                    color: Color(0xFF828282),
+                child: DropdownMenu<Mode>(
+                  onSelected: (value) {
+                    setState(() {
+                      selectedMode = value;
+                    });
+                  },
+                  hintText: "Function",
+                  width: 400,
+                  menuHeight: 400,
+                  textStyle: const TextStyle(
+                    color: Color(0xFF828282)
                   ),
-                  filled: true,
-                  fillColor: Color(0xFF303030),
-                  border: InputBorder.none
+                  inputDecorationTheme: const InputDecorationTheme(
+                    hintStyle: TextStyle(
+                      color: Color(0xFF828282),
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(15),
+                  ),
+                  dropdownMenuEntries: Mode.values.map<DropdownMenuEntry<Mode>>((Mode mode) {
+                    return DropdownMenuEntry<Mode>(
+                      value: mode,
+                      label: mode.name.toUpperCase(),
+                    );
+                  }).toList(),
                 ),
-                dropdownMenuEntries: Mode.values.map<DropdownMenuEntry<Mode>>((Mode mode) {
-                  return DropdownMenuEntry<Mode>(
-                    value: mode,
-                    label: mode.name.toUpperCase(),
-                  );
-                }).toList(),
               ),
               const SizedBox(
-                height: 24,
+                height: 16,
               ),
               ElevatedButton(
-                onPressed: addConfig,
+                onPressed: () {
+                  setState(addConfig);
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF436C92),
                   minimumSize: const Size(450, 50),
@@ -269,6 +286,41 @@ class BoardConfigPage extends State<MyHomePage> {
                     fontWeight: FontWeight.w500,
                     fontSize: 16,
                   ),
+                ),
+              ),
+              const SizedBox(
+                height: 24,
+              ),
+              const Divider(),
+              const SizedBox(
+                height: 24,
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: config.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final Map<String, dynamic> item = config[index];
+                    return ListTile(
+                      title: Text(
+                        'GPIO: ${item["gpio"]}, Mode: ${item["mode"]}, Output: ${item["output"]}',
+                        style: const TextStyle(
+                          color: Colors.white
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.red
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            config.removeAt(index);
+                            sendConfig();
+                          });
+                        },
+                      ),
+                    );
+                  },
                 ),
               ),
             ],

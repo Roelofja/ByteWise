@@ -1,39 +1,50 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <SPIFFS.h>
 
 /* Your unique ByteWise device token goes here */
 #define BYTEWISE_DEVICE_TOKEN "mA2Prw6ZqllC9PXr"
+
+/* Your WiFi information goes here */
+char ssid[] = "NETGEAR61";
+char password[] = "pastelapple849";
 
 #define MQTT_SERVER "bytewise.cloud.shiftr.io"
 #define MQTT_PORT 1883
 #define MQTT_USER "bytewise"
 #define MQTT_PASS "gDQI0dHuCD0bXwTG"
 
-/* Your WiFi information goes here */
-char ssid[] = "NETGEAR61";
-char password[] = "pastelapple849";
+JsonDocument config; // Locally stored device config variable
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 String clientId; // Unique client ID for this device
-String instanceTopic; // Unique app instance topic
-String statusTopic; // Unique status/will topic for this device 
-
-String messageRecieved;
+String deviceTopic; // Unique app instance topic
+String statusTopic; // Unique status/will topic for this device
 
 void setupWifi();
 void setupMqtt();
 void messageRecievedCallback(char* topic, byte* payload, unsigned int length);
 void reconnect();
+void applyConfig(JsonDocument config);
+void saveConfigToFile(JsonDocument config);
+void loadConfigFromFile(JsonDocument& config);
 
 // Setup before loop
 void setup()
 {
     Serial.begin(115200);
+    if(!SPIFFS.begin(true))
+    {
+        Serial.println("Failed to mount file system");
+        return;
+    }
     setupWifi();
     setupMqtt();
+    loadConfigFromFile(config);
+    applyConfig(config);
 }
 
 // Main loop 
@@ -51,16 +62,15 @@ void setupWifi()
     delay(10);
     Serial.println();
     Serial.print("Connecting to ");
-    Serial.println(ssid);
+    Serial.print(ssid);
     WiFi.begin(ssid, password);
     while(WiFi.status() != WL_CONNECTED)
     {
         delay(500);
         Serial.print(".");
     }
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
+    Serial.println("\nWiFi connected");
+    Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 }
 
@@ -69,8 +79,8 @@ void setupMqtt()
     uint64_t chipId = ESP.getEfuseMac(); // ESP32 MAC address
 
     clientId = "ESP32-" + String(chipId, HEX);
-    instanceTopic = "/instances/" BYTEWISE_DEVICE_TOKEN;
-    statusTopic = "/devices/" + clientId + "/status";
+    deviceTopic = "/devices/" BYTEWISE_DEVICE_TOKEN;
+    statusTopic = deviceTopic + "/status";
 
     client.setServer(MQTT_SERVER, MQTT_PORT);
     client.setCallback(messageRecievedCallback);
@@ -80,7 +90,6 @@ void setupMqtt()
 void messageRecievedCallback(char* topic, byte* payload, unsigned int length)
 {
     // Parse the JSON message
-    JsonDocument config;
     DeserializationError error = deserializeJson(config, payload);
     
     // Check for parsing errors
@@ -91,6 +100,34 @@ void messageRecievedCallback(char* topic, byte* payload, unsigned int length)
         return;
     }
 
+    saveConfigToFile(config);
+    applyConfig(config);
+}
+
+void reconnect()
+{
+    while(!client.connected())
+    {
+        Serial.println("Attempting MQTT connection...");
+        if(client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS, 
+                          statusTopic.c_str(), 1, true, "0"))
+        {
+            Serial.println("MQTT connected");
+            client.subscribe(deviceTopic.c_str());
+            client.publish(statusTopic.c_str(), "1", true);
+        }
+        else
+        {
+            Serial.print("Failed, rc=");
+            Serial.print(client.state());
+            Serial.println("Trying again in 5 seconds...");
+            delay(5000);
+        }
+    } 
+}
+
+void applyConfig(JsonDocument config)
+{
     JsonArray configArray = config["config"];
 
     for(JsonObject obj : configArray)
@@ -104,29 +141,42 @@ void messageRecievedCallback(char* topic, byte* payload, unsigned int length)
         if(mode == OUTPUT)
         {
             digitalWrite(gpio, output);
-            Serial.println(", Pin " + String(gpio) + " mode set to " + String(output));
+            Serial.println("Pin " + String(gpio) + " mode set to " + String(output));
         }
     }
 }
 
-void reconnect()
+void saveConfigToFile(JsonDocument config)
 {
-    while(!client.connected())
+    File configFile = SPIFFS.open("/config.json", "w");
+    if(!configFile)
     {
-        Serial.print("Attempting MQTT connection...");
-        if(client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS, 
-                          statusTopic.c_str(), 1, false, "0"))
-        {
-            Serial.println("connected");
-            client.subscribe(instanceTopic.c_str());
-            client.publish(statusTopic.c_str(), "1", true);
-        }
-        else
-        {
-            Serial.print("Failed, rc=");
-            Serial.print(client.state());
-            Serial.println("Trying again in 5 seconds...");
-            delay(5000);
-        }
-    } 
+        Serial.println("Failed to open config file for writing");
+        return;
+    }
+
+    serializeJson(config, configFile);
+    configFile.close();
+    Serial.println("Config saved to file");
+}
+
+void loadConfigFromFile(JsonDocument& config)
+{
+    File configFile = SPIFFS.open("/config.json", "r");
+    if(!configFile)
+    {
+        Serial.println("Failed to open config file");
+        return;
+    }
+
+    DeserializationError error = deserializeJson(config, configFile);
+    if(error)
+    {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+    }
+
+    configFile.close();
+    Serial.println("Config loaded from file");
 }
