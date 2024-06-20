@@ -4,16 +4,16 @@
 #include <SPIFFS.h>
 
 /* Your unique ByteWise device token goes here */
-#define BYTEWISE_DEVICE_TOKEN "mA2Prw6ZqllC9PXr"
+#define BYTEWISE_DEVICE_TOKEN "HOfycXUt"
 
 /* Your WiFi information goes here */
 char ssid[] = "NETGEAR61";
 char password[] = "pastelapple849";
 
-#define MQTT_SERVER "bytewise.cloud.shiftr.io"
+#define MQTT_SERVER "bytewisetest.cloud.shiftr.io"
 #define MQTT_PORT 1883
-#define MQTT_USER "bytewise"
-#define MQTT_PASS "gDQI0dHuCD0bXwTG"
+#define MQTT_USER "bytewisetest"
+#define MQTT_PASS "DDTBF09zOgqyk97y"
 
 JsonDocument config; // Locally stored device config variable
 
@@ -137,11 +137,11 @@ void applyConfig(JsonDocument config)
         uint8_t output = obj["output"];
 
         pinMode(gpio, mode);
-        Serial.println("Pin " + String(gpio) + " set to " + String(mode));
+        Serial.println("Pin " + String(gpio) + " set to mode " + String(mode));
         if(mode == OUTPUT)
         {
             digitalWrite(gpio, output);
-            Serial.println("Pin " + String(gpio) + " mode set to " + String(output));
+            Serial.println("Pin " + String(gpio) + " output set to " + String(output));
         }
     }
 }

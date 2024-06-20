@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'dart:math';
+import 'package:provider/provider.dart';
 
 typedef Config = List<Map<String, dynamic>>;
 
@@ -45,24 +46,49 @@ enum Mode {
   final int value;
 }
 
-Config config = []; // ESP-32 board configuration
+class Board {
+  static int idCounter = 0;
 
-GPIO? selectedGpio;
-Mode? selectedMode;
-Color statusColor = const Color(0xFF901616);
+  final int id = ++idCounter;
+  final String authToken = generateUniqueToken(8);
+  Config config = []; // ESP-32 board configuration
+  Color statusColor = const Color(0xFF901616);
+}
 
-final client = MqttServerClient('bytewise.cloud.shiftr.io', 'BW-${generateUniqueToken(16)}');
+class BoardStatusHandler with ChangeNotifier {
+
+  void listenForStatus(Board board) {
+    print("Created");
+    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? messages) {
+      final MqttReceivedMessage<MqttMessage?> message = messages![0];
+      final topic = message.topic;
+
+      if(topic == 'devices/${board.authToken}/status') {
+        final pubMessage = message.payload as MqttPublishMessage;
+        final payload = MqttPublishPayload.bytesToStringAsString(pubMessage.payload.message);
+        if(payload.isNotEmpty) {
+          if(payload == '1') {
+            board.statusColor = const Color(0xFF16906C);
+          } else {
+            board.statusColor = const Color(0xFF901616);
+          }
+          notifyListeners();
+        }
+        print(payload);
+      }
+    });
+  }
+}
+
+const String mqttServer = "bytewisetest.cloud.shiftr.io";
+const String mqttUser = "bytewisetest";
+const String mqttPass = "DDTBF09zOgqyk97y";
+
+List<Board> boards = []; // List of added boards
+
+final client = MqttServerClient(mqttServer, 'BW-${generateUniqueToken(16)}');
 
 const String tokenChars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
-
-void main() async {
-  client.keepAlivePeriod = 20;
-  client.onConnected = onConnected;
-  client.onDisconnected = onDisconnected;
-  await client.connect('bytewise', 'gDQI0dHuCD0bXwTG');
-
-  runApp(const ByteWise());
-}
 
 void onConnected() {
   print('Connected to MQTT broker');
@@ -72,37 +98,32 @@ void onDisconnected() {
   print('Disconnected from MQTT broker');
 }
 
-void addConfig() {
-  if(selectedGpio != null && selectedMode != null) {
-    bool isUnique = config.every((element) =>
-      element['gpio'] != selectedGpio!.value
-    );
-    if(isUnique){
-      config.add(
-        {
-          "gpio": selectedGpio!.value,
-          "mode": selectedMode!.value,
-          "output": 1,
-        }
-      );
-      sendConfig();
-    }
-  }
-}
-
-void sendConfig() {
-  final MqttClientPayloadBuilder builder = MqttClientPayloadBuilder();
-  final String jsonData = jsonEncode({"config": config});
-  builder.addString(jsonData);
-  client.publishMessage('/devices/mA2Prw6ZqllC9PXr', MqttQos.atLeastOnce, builder.payload!);
-  print(jsonData);
-}
-
 String generateUniqueToken(int length) {
   Random r = Random.secure();
   return String.fromCharCodes(Iterable.generate(
     length, (_) => tokenChars.codeUnitAt(r.nextInt(tokenChars.length))
   ));
+}
+
+void main() async {
+  client.setProtocolV311(); // Needed or shiftr MQTT breaks on unsubscribe
+  client.keepAlivePeriod = 20;
+  client.onConnected = onConnected;
+  client.onDisconnected = onDisconnected;
+
+  try {
+    await client.connect(mqttUser, mqttPass);
+  } catch(e) {
+    print('Exception: $e');
+    client.disconnect();
+  }
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => BoardStatusHandler(),
+      child: const ByteWise(),
+    )
+  );
 }
 
 // App Building //
@@ -113,7 +134,7 @@ class ByteWise extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: const MyHomePage(),
+      home: const BoardSelectPage(),
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         fontFamily: "Inter",
@@ -122,35 +143,150 @@ class ByteWise extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+class BoardSelectPage extends StatefulWidget {
+  const BoardSelectPage({super.key});
 
   @override
-  State<MyHomePage> createState() => BoardConfigPage();
+  State<BoardSelectPage> createState() => BoardSelectState();
 }
 
-class BoardConfigPage extends State<MyHomePage> {
-  
+class BoardSelectState extends State<BoardSelectPage> {
 
   @override
-  void initState() {
-    client.subscribe("devices/mA2Prw6ZqllC9PXr/status", MqttQos.atLeastOnce);
-    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? messages) {
-      final MqttPublishMessage message = messages![0].payload as MqttPublishMessage;
-      final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message);
-      if(payload.isNotEmpty) {
-        setState(() {
-          if(payload == '1') {
-            statusColor = const Color(0xFF16906C);
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1E1E1E),
+      appBar: AppBar(
+        centerTitle: true,
+        backgroundColor: const Color(0xFF2D4963),
+        title: Image.asset(
+          "images/logo_text_plain.png",
+          height: 25,
+        )
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: boards.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final board = boards[index];
+                    return ListTile(
+                      title: Text(
+                        "Board: ${board.id}\nToken: ${board.authToken}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.red
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            client.unsubscribe('devices/${board.authToken}/status');
+                            boards.removeAt(index);
+                          });
+                        },
+                      ),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => BoardConfigPage(board: board)),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(
+                height: 24,
+              ),
+              const Divider(),
+              const SizedBox(
+                height: 24,
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Board board = Board();
+                  client.subscribe('devices/${board.authToken}/status', MqttQos.atLeastOnce);
+                  var handler = context.read<BoardStatusHandler>();
+                  handler.listenForStatus(board);
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => BoardConfigPage(board: board)
+                    ),
+                  );
+                  setState(() {
+                    boards.add(board);
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF436C92),
+                  minimumSize: const Size(450, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  "+ Add Board",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ]
+          )
+        )
+      )
+    );
+  }
+}
+
+class BoardConfigPage extends StatefulWidget {
+
+  final Board board;
+  const BoardConfigPage({super.key, required this.board});
+
+  @override
+  State<BoardConfigPage> createState() => BoardConfigState();
+}
+
+class BoardConfigState extends State<BoardConfigPage> {
+  GPIO? selectedGpio;
+  Mode? selectedMode;
+
+  void addConfig(String authToken) {
+    if(selectedGpio != null && selectedMode != null) {
+      bool isUnique = widget.board.config.every((element) =>
+        element['gpio'] != selectedGpio!.value
+      );
+      if(isUnique){
+        widget.board.config.add(
+          {
+            "gpio": selectedGpio!.value,
+            "mode": selectedMode!.value,
+            "output": 1,
           }
-          else {
-            statusColor = const Color(0xFF901616);
-          }
-        });
+        );
+        sendConfig(authToken);
       }
-      print(payload);
-    });
-    super.initState();
+    }
+  }
+
+  void sendConfig(String authToken) {
+    final MqttClientPayloadBuilder builder = MqttClientPayloadBuilder();
+    final String jsonData = jsonEncode({"config": widget.board.config});
+    builder.addString(jsonData);
+    client.publishMessage('/devices/$authToken', MqttQos.atLeastOnce, builder.payload!);
+    print(jsonData);
   }
 
   @override
@@ -172,9 +308,11 @@ class BoardConfigPage extends State<MyHomePage> {
             const SizedBox(
               width: 10,
             ),
-            CircleAvatar(
-              backgroundColor: statusColor,
-              maxRadius: 8,
+            Consumer<BoardStatusHandler>(
+              builder: (context, status, child) => CircleAvatar(
+                backgroundColor: widget.board.statusColor,
+                maxRadius: 8,
+              )
             )
           ],
         ),
@@ -184,6 +322,30 @@ class BoardConfigPage extends State<MyHomePage> {
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Text(
+                    "Board: ${widget.board.id}",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                    ),
+                  ),
+                  Text(
+                    "Token: ${widget.board.authToken}",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(
+                height: 24,
+              ),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -270,7 +432,9 @@ class BoardConfigPage extends State<MyHomePage> {
               ),
               ElevatedButton(
                 onPressed: () {
-                  setState(addConfig);
+                  setState(() {
+                    addConfig(widget.board.authToken);
+                  });
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF436C92),
@@ -297,9 +461,9 @@ class BoardConfigPage extends State<MyHomePage> {
               ),
               Expanded(
                 child: ListView.builder(
-                  itemCount: config.length,
+                  itemCount: widget.board.config.length,
                   itemBuilder: (BuildContext context, int index) {
-                    final Map<String, dynamic> item = config[index];
+                    final Map<String, dynamic> item = widget.board.config[index];
                     return ListTile(
                       title: Text(
                         'GPIO: ${item["gpio"]}, Mode: ${item["mode"]}, Output: ${item["output"]}',
@@ -314,8 +478,8 @@ class BoardConfigPage extends State<MyHomePage> {
                         ),
                         onPressed: () {
                           setState(() {
-                            config.removeAt(index);
-                            sendConfig();
+                            widget.board.config.removeAt(index);
+                            sendConfig(widget.board.authToken);
                           });
                         },
                       ),
