@@ -53,6 +53,19 @@ class Board {
   final String authToken = generateUniqueToken(8);
   Config config = []; // ESP-32 board configuration
   Color statusColor = const Color(0xFF901616);
+
+  void addTo(List boards) {
+    boards.add(this);
+  }
+
+  void removeFrom(List boards) {
+    boards.remove(this);
+    idCounter--;
+  }
+
+  static void resetIdCounter() {
+    idCounter = 0;
+  }
 }
 
 class BoardStatusHandler with ChangeNotifier {
@@ -80,9 +93,9 @@ class BoardStatusHandler with ChangeNotifier {
   }
 }
 
-const String mqttServer = "bytewisetest.cloud.shiftr.io";
-const String mqttUser = "bytewisetest";
-const String mqttPass = "DDTBF09zOgqyk97y";
+const String mqttServer = "bytewise.cloud.shiftr.io";
+const String mqttUser = "bytewise";
+const String mqttPass = "gDQI0dHuCD0bXwTG";
 
 List<Board> boards = []; // List of added boards
 
@@ -128,8 +141,19 @@ void main() async {
 
 // App Building //
 
-class ByteWise extends StatelessWidget {
+class ByteWise extends StatefulWidget {
   const ByteWise({super.key});
+
+  @override
+  State<ByteWise> createState() => ByteWiseState();
+}
+
+class ByteWiseState extends State<ByteWise> {
+  @override
+  void dispose() {
+    Board.resetIdCounter();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -191,7 +215,7 @@ class BoardSelectState extends State<BoardSelectPage> {
                         onPressed: () {
                           setState(() {
                             client.unsubscribe('devices/${board.authToken}/status');
-                            boards.removeAt(index);
+                            board.removeFrom(boards);
                           });
                         },
                       ),
@@ -214,6 +238,7 @@ class BoardSelectState extends State<BoardSelectPage> {
               ElevatedButton(
                 onPressed: () async {
                   Board board = Board();
+                  board.addTo(boards);
                   client.subscribe('devices/${board.authToken}/status', MqttQos.atLeastOnce);
                   var handler = context.read<BoardStatusHandler>();
                   handler.listenForStatus(board);
@@ -222,9 +247,7 @@ class BoardSelectState extends State<BoardSelectPage> {
                       builder: (context) => BoardConfigPage(board: board)
                     ),
                   );
-                  setState(() {
-                    boards.add(board);
-                  });
+                  setState(() {});
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF436C92),

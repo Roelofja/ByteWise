@@ -1,30 +1,246 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mqtt_client/mqtt_client.dart';
+import 'package:mqtt_client/mqtt_server_client.dart';
+import 'package:provider/provider.dart';
+import 'package:bytewise/main.dart'; 
 
-import 'package:bytewise/main.dart';
+// Create a test client to test simulated status updates
+final testingClient = MqttServerClient(mqttServer, 'TestingClient');
 
-void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+void simulateStatusMessage(Board board, String payload) async {
+  final builder = MqttClientPayloadBuilder();
+  builder.addString(payload);
+  testingClient.publishMessage('devices/${board.authToken}/status', MqttQos.atLeastOnce, builder.payload!);
+}
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+void main() async{
+  // Connect to MQTT server
+  client.setProtocolV311(); // Needed or shiftr MQTT breaks on unsubscribe
+  client.keepAlivePeriod = 20;
+  try {
+    await client.connect(mqttUser, mqttPass);
+  } catch(e) {
+    print('Exception: $e');
+    client.disconnect();
+  }
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  // Create and connect a test client to the server to test simulated status updates
+  testingClient.setProtocolV311(); // Needed or shiftr MQTT breaks on unsubscribe
+  testingClient.keepAlivePeriod = 20;
+  try {
+    await testingClient.connect(mqttUser, mqttPass);
+  } catch(e) {
+    print('Exception: $e');
+    testingClient.disconnect();
+  }
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('Test adding and removing boards', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (context) => BoardStatusHandler(),
+        child: const ByteWise(),
+      ),
+    );
+
+    // Verify if the Add Board button is present
+    expect(find.text('+ Add Board'), findsOneWidget);
+
+    // Tap the Add Board button
+    await tester.tap(find.text('+ Add Board'));
+    await tester.pumpAndSettle();
+
+    // Verify if the BoardConfigPage is displayed
+    expect(find.text('Create Pin Function'), findsOneWidget);
+    expect(find.text('Apply'), findsOneWidget);
+    expect(
+      tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+      equals(const Color(0xFF901616)), // Initial status color
+    );
+
+    // Go back to the BoardSelectPage
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+
+    // Verify if the board is added to the list
+    expect(find.textContaining('Board: 1'), findsOneWidget);
+    expect(find.textContaining('Token:'), findsOneWidget);
+
+    // Delete the added board
+    await tester.tap(find.byIcon(Icons.delete));
+    await tester.pumpAndSettle();
+
+    // Verify if the board is removed from the list
+    expect(find.textContaining('Board: 1'), findsNothing);
+
+    // Clear boards for subsequent tests
+    boards.clear();
   });
+
+  testWidgets('Test adding configuration to a board', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (context) => BoardStatusHandler(),
+        child: const ByteWise(),
+      ),
+    );
+
+    // Tap the Add Board button
+    await tester.tap(find.text('+ Add Board'));
+    await tester.pumpAndSettle();
+
+    // Verify if the BoardConfigPage is displayed
+    expect(find.text('Create Pin Function'), findsOneWidget);
+    expect(find.text('Apply'), findsOneWidget);
+    expect(
+      tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+      equals(const Color(0xFF901616)), // Initial status color
+    );
+
+    // Select GPIO pin and mode
+    await tester.tap(find.byType(DropdownMenu<GPIO>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('GPIO1').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownMenu<Mode>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OUTPUT').last);
+    await tester.pumpAndSettle();
+
+    // Tap the Apply button
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+
+    // Verify if the configuration is added to the list
+    expect(find.textContaining('GPIO: 1, Mode: 3, Output: 1'), findsOneWidget);
+
+    // Clear boards for subsequent tests
+    boards.clear();
+  });
+
+  testWidgets('Test boards are independent', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (context) => BoardStatusHandler(),
+        child: const ByteWise(),
+      ),
+    );
+
+    // Tap the Add Board button
+    await tester.tap(find.text('+ Add Board'));
+    await tester.pumpAndSettle();
+
+    // Verify if the BoardConfigPage is displayed and board 1 is created
+    expect(find.textContaining('Board: 1'), findsOneWidget);
+    expect(find.text('Create Pin Function'), findsOneWidget);
+    expect(find.text('Apply'), findsOneWidget);
+    expect(
+      tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+      equals(const Color(0xFF901616)), // Initial status color
+    );
+
+    // Add multiple output configurations for board 1
+    for (int i = 1; i <= 2; i++) {
+      await tester.tap(find.byType(DropdownMenu<GPIO>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('GPIO$i').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(DropdownMenu<Mode>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OUTPUT').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+    }
+
+    // Verify if multiple configurations are added to the list
+    for (int i = 1; i <= 2; i++) {
+      expect(find.textContaining('GPIO: $i, Mode: 3, Output: 1'), findsOneWidget);
+    }
+
+    // Create a new board
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    print(boards.first.id);
+    await tester.tap(find.text('+ Add Board'));
+    await tester.pumpAndSettle();
+
+    // Verify if the BoardConfigPage is displayed and board 2 is created
+    expect(find.textContaining('Board: 2'), findsOneWidget);
+    expect(find.text('Create Pin Function'), findsOneWidget);
+    expect(find.text('Apply'), findsOneWidget);
+    expect(
+      tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+      equals(const Color(0xFF901616)), // Initial status color
+    );
+
+    // Add multiple input configurations for board 2
+    for (int i = 3; i <= 4; i++) {
+      await tester.tap(find.byType(DropdownMenu<GPIO>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('GPIO$i').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(DropdownMenu<Mode>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('INPUT').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+    }
+
+    // Verify if multiple configurations are added to the list
+    for (int i = 3; i <= 4; i++) {
+      expect(find.textContaining('GPIO: $i, Mode: 1, Output: 1'), findsOneWidget);
+    }
+
+    // Go back to first board
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    
+    await tester.tap(find.textContaining('Board: 1'));
+    await tester.pumpAndSettle();
+
+    // Verify settings were remebered for board 1
+    for (int i = 1; i <= 2; i++) {
+      expect(find.textContaining('GPIO: $i, Mode: 3, Output: 1'), findsOneWidget);
+    }
+
+    // Clear boards for subsequent tests
+    boards.clear();
+  });
+
+  // testWidgets('Test board status change on message reception', (WidgetTester tester) async {
+  //   await tester.pumpWidget(
+  //     ChangeNotifierProvider(
+  //       create: (context) => BoardStatusHandler(),
+  //       child: const ByteWise(),
+  //     ),
+  //   );
+
+  //   // Tap the Add Board button
+  //   await tester.tap(find.text('+ Add Board'));
+  //   await tester.pumpAndSettle();
+
+  //   // Verify default status color
+  //   expect(
+  //     tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+  //     equals(const Color(0xFF901616)), // Initial status color
+  //   );
+
+  //   simulateStatusMessage(boards.first, '1');
+    
+
+  //   //Verify the status color changes
+  //   expect(
+  //     tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+  //     equals(const Color(0xFF16906C)), // Status color after receiving '1'
+  //   );
+
+  //   testingClient.disconnect();
+  // });
 }
