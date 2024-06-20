@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/logo.png" width="200" title="BUET LOGO">
+  <img src="images/logo.png" width="200" title="BUET LOGO">
 </p>
 
 # ByteWise : A Quality of Life IOT App For ESP32
