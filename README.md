@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.png" width="200" title="BUET LOGO">
+  <img src="images/logo.png" width="200" title="ByteWise">
 </p>
 
 # ByteWise : A Quality of Life IOT App For ESP32
@@ -19,10 +19,25 @@ When working with microcontrollers, development and programming can be tedious a
 The **ByteWise** app communicates with the ESP-32 using a wifi connection. Once the app and the ESP-32 are on a wifi network, they communicate using an MQTT broker to send and recieve updates. The app sends the user's currently configured settings as a json string to the ESP-32 where the ESP-32 then parses that string and sets the pins accordingly. The app recieves live board connection status updates showing the user whether their board is connected or disconnected from the app. When a configuration string is sent to the board, the ESP-32 uses it's built in SPIFFS file system to create and store a local json file containing the configuration settings. This allows the board tp pull and reapply the configuration settings after the board is reset or looses power. 
 
 ### 3.1 Use Case Diagram
+The use case diagram showing the basic implementation of the app.
+<p align="center">
+  <img src="images/useCase.png" width="1000" 
+  Figure 1: Use Case Diagram
+</p>
 
 ### 3.2 Class Diagram
+The class diagram for the ByteWise application.
+<p align="center">
+  <img src="images/class.png" width="1000" 
+  Figure 2: Class Diagram
+</p>
 
 ### 3.3 Sequence Diagram
+The sequence diagram for the ByteWise application.
+<p align="center">
+  <img src="images/sequence.png" width="1000" 
+  Figure 3: Sequence Diagram
+</p>
 
 ## 4 User Guide/Implementation
 
@@ -291,27 +306,46 @@ void loadConfigFromFile(JsonDocument& config)
 }
 ```
 
-### 4.1 Client Side
+### 4.2 Client Side
 
-#### 4.1.1 Starting the Application
+#### 4.2.1 Boards Page
+When the app is started the user is presented with the add board page. This is where the user can add and select pre-existing boards as well as delete them.
+<p align="center">
+  <img src="images/boardsPage.png" width="300">
+  <br>
+  Figure 4: Boards Page
+</p>
+<br>
+<p align="center">
+  <img src="images/boardsPopulated.png" width="300">
+  <br>
+  Figure 5: Boards Page With Added Boards
+</p>
 
-#### 4.1.2 Registration
+#### 4.2.2 Config Page
+When a new board is created or a pre-existing board is selected, the user is met with the config page. This is where the user can add and delete pin functions for their board and see their board's current connection status.
+<p align="center">
+  <img src="images/configPage.png" width="300">
+  <br>
+  Figure 6: Config Page
+</p>
+<br>
+<p align="center">
+  <img src="images/configPageConnectedAndPopulated.png" width="300">
+  <br>
+  Figure 7: Config Page With Added Boards
+</p>
+When a user adds or deletes a new configuration, a json string is sent to the MQTT broker with the currently active settings. The ESP recieves this message and converts it into useable data to apply the pin settings. The status is updated by the app subscribing to the boards status topic on the broker and the ESP sending a message to the app when the board gets powered. A will message is set by the ESP so that when it loses power, the app gets a message that updates to the user the board is disconnected.
 
-#### 4.1.3 LogIn
-
-### 4.2 Home
-
-#### 4.2.1 Vehicle Details
-
-#### 4.2.2 Adding Garage as Renter
-
-#### 4.2.3 Location Selection for Parking
-
-#### 4.2.4 Notification Details
-
-### 4.3 Confirmation and Payment
+#### 4.2.3 ESP-32 SPIFFS
+The ESP-32 uses its built in SPIFFS file system to save any config sent to the board as a retreavable json file. This allows the configs to be reapplied after the board has been powered off or reset. Whether the config file is being read back from the on board json or a new json string is being sent by the broker, the ESP takes the data and sets the according pins with their settings.
 
 ### 4.4 Server Side
+The app and ESP communicate over an MQTT broker. This broker is currently being supplied by shiftr.io which is a free instance and has limited uptime. A visual representation of the broker and its connections can be seen below.
+
+<div style="display: flex; justify-content: center; width: 100%;">
+  <iframe src="https://bytewise.cloud.shiftr.io/embed?widgets=1" style="width: 100%; max-width: 1200px; height: 600px;" frameborder="0" allowfullscreen></iframe>
+</div>
 
 ## 5 Future Scope
 Due to limitations in time, some features and ideas that we wanted to implement did not make it in time for the project deadline. With more development, we wanted to add the ability to change the wifi network used for the ESP-32 from within the app after a board was connected for the first time using some sort of OTA update system. Additionally, we wanted to add more pin functions other than just input and output such as predefined functions like a blink mode, or additional board features like PWM. We also wanted to add a login screen and account system to remember a users settings after the app is closed and to better provide the user with the ESP startup code.
