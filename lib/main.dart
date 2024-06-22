@@ -54,11 +54,16 @@ class Board {
   Config config = []; // ESP-32 board configuration
   Color statusColor = const Color(0xFF901616);
 
+  Board() {
+    client.subscribe('devices/$authToken/status', MqttQos.atLeastOnce);
+  }
+
   void addTo(List boards) {
     boards.add(this);
   }
 
-  void removeFrom(List boards) {
+  void removeAndUnsubscribe(List boards) {
+    client.unsubscribe('devices/$authToken/status');
     boards.remove(this);
     idCounter--;
   }
@@ -214,8 +219,7 @@ class BoardSelectState extends State<BoardSelectPage> {
                         ),
                         onPressed: () {
                           setState(() {
-                            client.unsubscribe('devices/${board.authToken}/status');
-                            board.removeFrom(boards);
+                            board.removeAndUnsubscribe(boards);
                           });
                         },
                       ),
@@ -239,9 +243,8 @@ class BoardSelectState extends State<BoardSelectPage> {
                 onPressed: () async {
                   Board board = Board();
                   board.addTo(boards);
-                  client.subscribe('devices/${board.authToken}/status', MqttQos.atLeastOnce);
                   var handler = context.read<BoardStatusHandler>();
-                  handler.listenForStatus(board);
+                  handler.listenForStatus(board);                 
                   await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) => BoardConfigPage(board: board)

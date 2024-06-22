@@ -1,19 +1,29 @@
+/**
+ * @file esp32.ino
+ *
+ * @brief ESP-32 ByteWise code. This code must be uploaded to a ESP-32
+ * to communicate with the ByteWise application.
+ *
+ * @authors Jayden Roelofs, Chris Lamus
+ * 
+ */
+
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <SPIFFS.h>
 
 /* Your unique ByteWise device token goes here */
-#define BYTEWISE_DEVICE_TOKEN "HOfycXUt"
+#define BYTEWISE_DEVICE_TOKEN "K6aHtsDg"
 
 /* Your WiFi information goes here */
 char ssid[] = "NETGEAR61";
 char password[] = "pastelapple849";
 
-#define MQTT_SERVER "bytewisetest.cloud.shiftr.io"
+#define MQTT_SERVER "bytewise.cloud.shiftr.io"
 #define MQTT_PORT 1883
-#define MQTT_USER "bytewisetest"
-#define MQTT_PASS "DDTBF09zOgqyk97y"
+#define MQTT_USER "bytewise"
+#define MQTT_PASS "gDQI0dHuCD0bXwTG"
 
 JsonDocument config; // Locally stored device config variable
 
@@ -32,7 +42,14 @@ void applyConfig(JsonDocument config);
 void saveConfigToFile(JsonDocument config);
 void loadConfigFromFile(JsonDocument& config);
 
-// Setup before loop
+/**
+ * The code run on startup
+ *
+ * Sets up the SPIFFS filesystem, connects to wifi, sets up MQTT
+ * connection, loads the stored configuration file, and applies
+ * the config file.
+ * 
+ */
 void setup()
 {
     Serial.begin(115200);
@@ -47,7 +64,12 @@ void setup()
     applyConfig(config);
 }
 
-// Main loop 
+/**
+ * The code run continuously
+ *
+ * connects to the MQTT broker and handles disconnects
+ * 
+ */
 void loop()
 {
     if(!client.connected())
@@ -57,6 +79,13 @@ void loop()
     client.loop();
 }
 
+/**
+ * Connects the board to wifi
+ *
+ * Connects to a wif network using the ssid and password
+ * entered at the top of the program
+ * 
+ */
 void setupWifi()
 {
     delay(10);
@@ -74,6 +103,15 @@ void setupWifi()
     Serial.println(WiFi.localIP());
 }
 
+/**
+ * Sets up configs for the ByteWise MQTT broker
+ *
+ * Creates a unique client ID from the board's MAC address.
+ * Configures the client to connect to the ByeWise MQTT broker.
+ * Creates unique topics for the ByteWise app to communicate over,
+ * and sets up message recieved callback and keep alive period.
+ * 
+ */
 void setupMqtt()
 {
     uint64_t chipId = ESP.getEfuseMac(); // ESP32 MAC address
@@ -87,6 +125,14 @@ void setupMqtt()
     client.setKeepAlive(1);
 }
 
+/**
+ * The function called whenever a message is recieved from the broker
+ *
+ * Parses the incomming json string and converts it to useable data.
+ * Saves the config to a json file on the filesystem and then applies it
+ * to the board.
+ * 
+ */
 void messageRecievedCallback(char* topic, byte* payload, unsigned int length)
 {
     // Parse the JSON message
@@ -104,6 +150,15 @@ void messageRecievedCallback(char* topic, byte* payload, unsigned int length)
     applyConfig(config);
 }
 
+/**
+ * Connects and reconnects to the MQTT broker
+ *
+ * Connects to the broker when there is no connection.
+ * Establishes the will message when the board is diconnected and
+ * sends a message on connection to notify the app that the board is
+ * online.
+ * 
+ */
 void reconnect()
 {
     while(!client.connected())
@@ -126,6 +181,13 @@ void reconnect()
     } 
 }
 
+/**
+ * Applies a json configuration
+ *
+ * Loops through each pin configuration and applies each setting of
+ * the JsonDocument.
+ * 
+ */
 void applyConfig(JsonDocument config)
 {
     JsonArray configArray = config["config"];
@@ -146,6 +208,13 @@ void applyConfig(JsonDocument config)
     }
 }
 
+/**
+ * Converts a config to a json document and stores it on the ESP
+ *
+ * Creates a json file if there is not one already puts the JsonDocument
+ * contents inside.
+ * 
+ */
 void saveConfigToFile(JsonDocument config)
 {
     File configFile = SPIFFS.open("/config.json", "w");
@@ -160,6 +229,13 @@ void saveConfigToFile(JsonDocument config)
     Serial.println("Config saved to file");
 }
 
+/**
+ * Load the config stored on the SPIFFS json and apply the settings
+ *
+ * Loads the config from the SPIFFS json, desearializes it, and stores it
+ * into the config JsonDocument to use throughout the program.
+ * 
+ */
 void loadConfigFromFile(JsonDocument& config)
 {
     File configFile = SPIFFS.open("/config.json", "r");

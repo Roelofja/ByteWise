@@ -37,6 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   mqtt_client: ^10.2.1
   provider: ^6.1.2
+  flutter_native_splash: ^2.4.0
 
 dev_dependencies:
   flutter_test:
@@ -103,3 +104,9 @@ flutter:
         - asset: fonts/Inter/Inter-SemiBold.ttf
         - asset: fonts/Inter/Inter-Thin.ttf
 
+flutter_native_splash:
+  color: "#1E1E1E"  # Background color of the splash screen
+  image: images/logo.png  # Path to your splash screen image
+  android: true  # Generate splash screen for Android
+  android_gravity: center  # Adjust the position of the splash screen image on Android
+  fullscreen: true  # Enable fullscreen mode for the splash screen

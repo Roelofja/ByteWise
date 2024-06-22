@@ -15,25 +15,31 @@ void simulateStatusMessage(Board board, String payload) async {
 }
 
 void main() async{
-  // Connect to MQTT server
-  client.setProtocolV311(); // Needed or shiftr MQTT breaks on unsubscribe
-  client.keepAlivePeriod = 20;
-  try {
-    await client.connect(mqttUser, mqttPass);
-  } catch(e) {
-    print('Exception: $e');
-    client.disconnect();
-  }
+  // Set up MQTT clients for testing
+  setUpAll(() async {
+    client.setProtocolV311();
+    client.keepAlivePeriod = 20;
+    try {
+      await client.connect(mqttUser, mqttPass);
+    } catch (e) {
+      print('Exception: $e');
+      client.disconnect();
+    }
 
-  // Create and connect a test client to the server to test simulated status updates
-  testingClient.setProtocolV311(); // Needed or shiftr MQTT breaks on unsubscribe
-  testingClient.keepAlivePeriod = 20;
-  try {
-    await testingClient.connect(mqttUser, mqttPass);
-  } catch(e) {
-    print('Exception: $e');
+  //   testingClient.setProtocolV311();
+  //   testingClient.keepAlivePeriod = 20;
+  //   try {
+  //     await testingClient.connect(mqttUser, mqttPass);
+  //   } catch (e) {
+  //     print('Exception: $e');
+  //     testingClient.disconnect();
+  //   }
+  });
+
+  tearDownAll(() async {
+    client.disconnect();
     testingClient.disconnect();
-  }
+  });
 
   testWidgets('Test adding and removing boards', (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -214,33 +220,35 @@ void main() async{
     boards.clear();
   });
 
-  // testWidgets('Test board status change on message reception', (WidgetTester tester) async {
-  //   await tester.pumpWidget(
-  //     ChangeNotifierProvider(
-  //       create: (context) => BoardStatusHandler(),
-  //       child: const ByteWise(),
-  //     ),
-  //   );
+//   testWidgets('Test board status change on message reception', (WidgetTester tester) async {
+//     await tester.pumpWidget(
+//       ChangeNotifierProvider(
+//         create: (context) => BoardStatusHandler(),
+//         child: const ByteWise(),
+//       ),
+//     );
 
-  //   // Tap the Add Board button
-  //   await tester.tap(find.text('+ Add Board'));
-  //   await tester.pumpAndSettle();
+//     // Tap the Add Board button
+//     await tester.tap(find.text('+ Add Board'));
+//     await tester.pumpAndSettle();
 
-  //   // Verify default status color
-  //   expect(
-  //     tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
-  //     equals(const Color(0xFF901616)), // Initial status color
-  //   );
+//     // Verify default status color
+//     expect(
+//       tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+//       equals(const Color(0xFF901616)), // Initial status color
+//     );
+//     client.subscribe('devices/${boards.first.authToken}/status', MqttQos.atLeastOnce);
+//     print(client.getSubscriptionsStatus('devices/${boards.first.authToken}/status'));
 
-  //   simulateStatusMessage(boards.first, '1');
-    
+//     simulateStatusMessage(boards.first, '1');
+//     await tester.pumpAndSettle();
 
-  //   //Verify the status color changes
-  //   expect(
-  //     tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
-  //     equals(const Color(0xFF16906C)), // Status color after receiving '1'
-  //   );
+//     //Verify the status color changes
+//     expect(
+//       tester.widget<CircleAvatar>(find.byType(CircleAvatar)).backgroundColor,
+//       equals(const Color(0xFF16906C)), // Status color after receiving '1'
+//     );
 
-  //   testingClient.disconnect();
-  // });
+//     testingClient.disconnect();
+//   });
 }
