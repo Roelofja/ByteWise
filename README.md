@@ -6,7 +6,9 @@
 ### Developed By : Jayden Roelofs | Chris Lamus
 ### Department : Computer Science and Engineering
 ### Jira Link: [ByteWise](https://cis350roelofja.atlassian.net/jira/software/projects/BYT/boards/2?atlOrigin=eyJpIjoiMTA2YWY0MzlkMTRlNDM2NTlkNDljZDI0ZWU4NzE2MGYiLCJwIjoiaiJ9)
+
 ---
+
 ## 1 Abstract
 
 When working with microcontrollers, development and programming can be tedious and time consuming for the unexperienced user, especially if they have not had any previous exposure. Whether it's a passion project or someone simply wants to experiement, the complexity that can come with microcontrollers could be discouraging to the average user. The **ByteWise** app aims to simplify the development process by providing a user friendly interface to connect an ESP-32 and begin development right away.

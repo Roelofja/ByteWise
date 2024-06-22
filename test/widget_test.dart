@@ -22,7 +22,6 @@ void main() async{
     try {
       await client.connect(mqttUser, mqttPass);
     } catch (e) {
-      print('Exception: $e');
       client.disconnect();
     }
 
@@ -31,7 +30,6 @@ void main() async{
   //   try {
   //     await testingClient.connect(mqttUser, mqttPass);
   //   } catch (e) {
-  //     print('Exception: $e');
   //     testingClient.disconnect();
   //   }
   });
@@ -170,7 +168,6 @@ void main() async{
     // Create a new board
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    print(boards.first.id);
     await tester.tap(find.text('+ Add Board'));
     await tester.pumpAndSettle();
 
@@ -238,7 +235,6 @@ void main() async{
 //       equals(const Color(0xFF901616)), // Initial status color
 //     );
 //     client.subscribe('devices/${boards.first.authToken}/status', MqttQos.atLeastOnce);
-//     print(client.getSubscriptionsStatus('devices/${boards.first.authToken}/status'));
 
 //     simulateStatusMessage(boards.first, '1');
 //     await tester.pumpAndSettle();

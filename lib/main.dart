@@ -76,7 +76,6 @@ class Board {
 class BoardStatusHandler with ChangeNotifier {
 
   void listenForStatus(Board board) {
-    print("Created");
     client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? messages) {
       final MqttReceivedMessage<MqttMessage?> message = messages![0];
       final topic = message.topic;
@@ -92,7 +91,6 @@ class BoardStatusHandler with ChangeNotifier {
           }
           notifyListeners();
         }
-        print(payload);
       }
     });
   }
@@ -108,14 +106,6 @@ final client = MqttServerClient(mqttServer, 'BW-${generateUniqueToken(16)}');
 
 const String tokenChars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
 
-void onConnected() {
-  print('Connected to MQTT broker');
-}
-
-void onDisconnected() {
-  print('Disconnected from MQTT broker');
-}
-
 String generateUniqueToken(int length) {
   Random r = Random.secure();
   return String.fromCharCodes(Iterable.generate(
@@ -126,13 +116,10 @@ String generateUniqueToken(int length) {
 void main() async {
   client.setProtocolV311(); // Needed or shiftr MQTT breaks on unsubscribe
   client.keepAlivePeriod = 20;
-  client.onConnected = onConnected;
-  client.onDisconnected = onDisconnected;
 
   try {
     await client.connect(mqttUser, mqttPass);
   } catch(e) {
-    print('Exception: $e');
     client.disconnect();
   }
 
@@ -312,7 +299,6 @@ class BoardConfigState extends State<BoardConfigPage> {
     final String jsonData = jsonEncode({"config": widget.board.config});
     builder.addString(jsonData);
     client.publishMessage('/devices/$authToken', MqttQos.atLeastOnce, builder.payload!);
-    print(jsonData);
   }
 
   @override
