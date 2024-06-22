@@ -21,21 +21,21 @@ The **ByteWise** app communicates with the ESP-32 using a wifi connection. Once 
 ### 3.1 Use Case Diagram
 The use case diagram showing the basic implementation of the app.
 <p align="center">
-  <img src="images/useCase.png" width="1000" 
+  <img src="images/useCase.png" width="1000">
   Figure 1: Use Case Diagram
 </p>
 
 ### 3.2 Class Diagram
 The class diagram for the ByteWise application.
 <p align="center">
-  <img src="images/class.png" width="1000" 
+  <img src="images/class.png" width="1000">
   Figure 2: Class Diagram
 </p>
 
 ### 3.3 Sequence Diagram
 The sequence diagram for the ByteWise application.
 <p align="center">
-  <img src="images/sequence.png" width="1000" 
+  <img src="images/sequence.png" width="1000">
   Figure 3: Sequence Diagram
 </p>
 
@@ -353,4 +353,8 @@ Due to limitations in time, some features and ideas that we wanted to implement 
 A major risk when developing this project was the potential of not being able to get the board and the app to communicate at all. We did not have much experience with communications over wifi networks so it took some time to figure out how to use the MQTT broker. We had to do a lot of development research to figure out how to connect the app and the ESP-32 to the broker and then develop a messaging system to get them to communicate with each other with relevent information. We faced issues with making each board independent from one another and have their own app connections. By making the board a class within the app and generating a unique token for each board that the user enters in thier ESP code, we were able to accomplish this. There was also a major issue getting the app to properly display the connection status of each board. When a board is connected we send a status message to the broker, and using the will message property of MQTT messaging we were able to send a message to the broker when the board was disconnected by any means. The problem was working around the app recieving the status message from the board and flutter widget states. There were many instances of the app crashing when a board was connected or disconnected which were fixed by handling states in a Provider which is a flutter package. Using the provider we made the callback used whenever the client recieved a message ping the status consumer that the state had changed. This fixed the status issue and made it correctly display. 
 
 The settings for the board that can be selected work, but ultimately are very limiting in what you can accomplish. We wanted to add more settings for the user to add but were limited by time. Additionally the UI for the lists of configurations could be improved and more user friendly to give a better idea of what the configured setting is doing. Originally during development you could only connect one board, however by isolating each board and its properites in a class we were able to connect multiple at a time. This is something we are proud got implimented as adding this caused a lot of bugs that had to be sorted. Currently the code that the user has to upload to thier board is located within this readme. If the user login and account creation was implemented we would have liked the code to be sent to the user's email.
-## 7 Walkthrough
+
+## 7 Demo
+Runthrough of app by Jayden: https://drive.google.com/file/d/1tJpyAaaO3zO8jEwPhbYjDut__S2ZKyCg/view?usp=sharing
+
+Chris showing his board controlled by Jayden's app: https://drive.google.com/file/d/1XiK5s__YvzmmUPIlzN7EXzux2hKjJ5rp/view?usp=drivesdk

@@ -14,11 +14,11 @@
 #include <SPIFFS.h>
 
 /* Your unique ByteWise device token goes here */
-#define BYTEWISE_DEVICE_TOKEN "K6aHtsDg"
+#define BYTEWISE_DEVICE_TOKEN "######"
 
 /* Your WiFi information goes here */
-char ssid[] = "NETGEAR61";
-char password[] = "pastelapple849";
+char ssid[] = "YourSSID";
+char password[] = "YourPassword";
 
 #define MQTT_SERVER "bytewise.cloud.shiftr.io"
 #define MQTT_PORT 1883
